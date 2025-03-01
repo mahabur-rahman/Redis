@@ -7,8 +7,8 @@ import { Redis } from 'ioredis'; // Import Redis for caching
 @Injectable()
 export class ProductsService {
   constructor(
-    @InjectModel(Product.name) private productModel: Model<Product>, // MongoDB model
-    @Inject('REDIS') private readonly redis: Redis, // Redis client
+    @InjectModel(Product.name) private productModel: Model<Product>,
+    @Inject('REDIS') private readonly redis: Redis,
   ) {}
 
   // Get all products (First check Redis, if not found fetch from MongoDB)
