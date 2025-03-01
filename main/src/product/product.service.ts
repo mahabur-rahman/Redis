@@ -2,33 +2,51 @@ import { Injectable, Inject } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Product } from './schema/product.schema';
-import { Redis } from 'ioredis';
+import { Redis } from 'ioredis'; // Import Redis for caching
 
 @Injectable()
 export class ProductsService {
   constructor(
-    @InjectModel(Product.name) private productModel: Model<Product>, // MongoDB মডেল ইনজেক্ট করা
-    @Inject('REDIS') private readonly redis: Redis, // Redis ক্লায়েন্ট ইনজেক্ট করা
+    @InjectModel(Product.name) private productModel: Model<Product>, // MongoDB model
+    @Inject('REDIS') private readonly redis: Redis, // Redis client
   ) {}
 
-  // সব পণ্য পাওয়া এবং Redis ক্যাশে চেক করা
+  // Get all products (First check Redis, if not found fetch from MongoDB)
   async getProducts(): Promise<Product[]> {
-    const cachedProducts = await this.redis.get('products'); // Redis থেকে পণ্য দেখুন
+    const cachedProducts = await this.redis.get('products'); // Try to fetch from Redis
 
     if (cachedProducts) {
       console.log('Returning from cache');
-      return JSON.parse(cachedProducts); // যদি ক্যাশে থাকে, তবে Redis থেকে পণ্য ফিরিয়ে দিন
+      return JSON.parse(cachedProducts); // Return cached data
     } else {
-      const products = await this.productModel.find().exec(); // MongoDB থেকে পণ্য নিয়ে আসুন
-      await this.redis.set('products', JSON.stringify(products), 'EX', 3600); // Redis ক্যাশে ১ ঘণ্টার জন্য সেভ করুন
+      // If not found in Redis, fetch from MongoDB
+      const products = await this.productModel.find().exec();
+
+      // Cache the result in Redis for 1 hour (3600 seconds)
+      await this.redis.set('products', JSON.stringify(products), 'EX', 3600);
+
       console.log('Returning from MongoDB');
-      return products; // MongoDB থেকে পণ্য ফেরত
+      return products; // Return products from MongoDB
     }
   }
 
-  // নতুন পণ্য তৈরি করা
+  // Create a new product (Save in MongoDB and update the Redis cache)
   async createProduct(productDto: any): Promise<Product> {
-    const newProduct = new this.productModel(productDto); // নতুন পণ্য তৈরি করুন
-    return newProduct.save(); // MongoDB এ পণ্য সেভ করুন
+    const newProduct = new this.productModel(productDto);
+
+    // Save the product in MongoDB
+    await newProduct.save();
+
+    // After saving in MongoDB, update the Redis cache
+    await this.updateRedisCache();
+
+    return newProduct;
+  }
+
+  // Update the Redis cache with the current products in MongoDB
+  private async updateRedisCache() {
+    const products = await this.productModel.find().exec(); // Get products from MongoDB
+    await this.redis.set('products', JSON.stringify(products), 'EX', 3600); // Save to Redis for 1 hour
+    console.log('Updated Redis cache with new products');
   }
 }

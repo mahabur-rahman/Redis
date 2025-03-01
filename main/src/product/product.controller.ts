@@ -5,15 +5,15 @@ import { ProductsService } from './product.service';
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
-  // GET: সব পণ্য ফিরিয়ে আনবে
+  // Get all products (Returns products from Redis or MongoDB)
   @Get()
   async getProducts() {
-    return this.productsService.getProducts(); // ProductsService থেকে পণ্য পেতে কল করবে
+    return this.productsService.getProducts();
   }
 
-  // POST: নতুন পণ্য তৈরি করবে
+  // Create a new product (Saves the product to MongoDB and updates Redis cache)
   @Post()
   async createProduct(@Body() productDto: any) {
-    return this.productsService.createProduct(productDto); // ProductsService এ পণ্য তৈরি করতে কল করবে
+    return this.productsService.createProduct(productDto);
   }
 }
